@@ -13,6 +13,11 @@ on:
         default: ""
         required: false
         type: string
+      strip_native_extensions:
+        description: "Strip Spotify's notification/widget extensions for signing tools that cannot sign them"
+        default: "false"
+        required: true
+        type: boolean
 
 env:
   THEOS: ${{ github.workspace }}/theos
@@ -128,15 +133,15 @@ jobs:
           [ -n "$FRAMEWORK_SRC" ] && INJECT+=("$FRAMEWORK_SRC")
           [ -n "$BUNDLE_SRC" ]    && INJECT+=("$BUNDLE_SRC")
 
-          # -d enable documents, -u drop UISupportedDevices, -m floor MinOS,
-          # -c max compress. Watch + native appex strip happens in the next
-          # step via Tools/strip-ipa.sh.
+          # -d enables documents, -u drops UISupportedDevices, -m floors MinOS,
+          # and -c sets compression. Native extensions are retained by default:
+          # Spotify uses them for notification, intent, and widget interactions.
           cyan -i ${{ github.workspace }}/spotify.ipa -o "$OUT" \
                -f "${INJECT[@]}" -c 9 -m 15.0 -du
           echo "OUT_IPA=$OUT" >> $GITHUB_ENV
 
-      - name: Strip incompatible bundles
-        if: ${{ inputs.ipa_url != '' }}
+      - name: Strip native extensions for limited signing tools
+        if: ${{ inputs.ipa_url != '' && inputs.strip_native_extensions }}
         run: |
           chmod +x Tools/strip-ipa.sh
           Tools/strip-ipa.sh "$OUT_IPA"
@@ -154,6 +159,23 @@ jobs:
           rm -f "$(basename "$OUT_IPA")"
           zip -qry "$(basename "$OUT_IPA")" Payload
           rm -rf Payload
+
+      - name: Verify Spotify notification extensions were retained
+        if: ${{ inputs.ipa_url != '' && !inputs.strip_native_extensions }}
+        run: |
+          expected=(
+            "IntentsExtension.appex"
+            "NotificationContentExtension.appex"
+            "NotificationServiceExtension.appex"
+            "WidgetExtension.appex"
+          )
+          for extension in "${expected[@]}"; do
+            unzip -l "$OUT_IPA" "Payload/Spotify.app/PlugIns/$extension/*" | \
+              grep -q "$extension" || {
+                echo "::error::Missing native Spotify extension: $extension"
+                exit 1
+              }
+          done
 
       # NOTE: Removed the post-injection ipapatch step.
       # If you later need it back, restore the "LC-inject zxPluginsInject (ipapatch)" step.
