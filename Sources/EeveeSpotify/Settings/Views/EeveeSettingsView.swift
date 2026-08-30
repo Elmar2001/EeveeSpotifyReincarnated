@@ -8,6 +8,7 @@ struct EeveeSettingsView: View {
     @State private var hasShownCommonIssuesTip = UserDefaults.hasShownCommonIssuesTip
     @State private var isClearingData = false
 
+
     private func confirmDestructive(
         title: String,
         message: String,
@@ -129,6 +130,19 @@ struct EeveeSettingsView: View {
                 )
             }
 
+            Button {
+                pushSettingsController(
+                    with: EeveeMiscellaneousSettingsView(),
+                    title: "miscellaneous".localized
+                )
+            } label: {
+                NavigationSectionView(
+                    color: .gray,
+                    title: "miscellaneous".localized,
+                    imageSystemName: "ellipsis.circle.fill"
+                )
+            }
+
             //
 
             Section(header: Text("debug_title".localized), footer: Text("debug_section_footer".localized)) {
@@ -235,7 +249,7 @@ struct EeveeSettingsView: View {
         
         .animation(.default, value: isClearingData)
         .animation(.default, value: hasShownCommonIssuesTip)
-        
+
         .onAppear {
             WindowHelper.shared.overrideUserInterfaceStyle(.dark)
         }
